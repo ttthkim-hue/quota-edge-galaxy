@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quota Edge — Live Glance</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --claude:#D97757; --codex:#10A37F; --bg:#010101; --muted:#8E8E93; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Roboto',sans-serif; background:#0a0a12; color:#fff; padding:32px 16px; }
+    h1 { text-align:center; font-size:32px; margin-bottom:6px; }
+    .sub { text-align:center; color:var(--muted); margin-bottom:28px; font-size:14px; }
+    .screens { display:flex; gap:24px; justify-content:center; flex-wrap:wrap; }
+    .label { color:var(--muted); font-size:12px; margin-bottom:8px; text-align:center; }
+    .phone { width:320px; height:693px; background:var(--bg); border-radius:40px; border:3px solid #2c2c2e; position:relative; overflow:hidden; }
+    .punch { width:12px;height:12px;background:#000;border-radius:50%;position:absolute;top:16px;left:50%;transform:translateX(-50%); }
+    .status { position:absolute; top:0; left:0; right:0; padding:14px 18px 0; }
+    .row { display:flex; justify-content:space-between; align-items:flex-start; }
+    .left { display:flex; flex-direction:column; gap:5px; }
+    .time { font-size:15px; font-weight:600; }
+    .glance { font-family:'Roboto Mono',monospace; font-size:11px; font-weight:700; line-height:1.35; }
+    .p { display:flex; flex-direction:column; gap:1px; }
+    .l1.claude { color:var(--claude); }
+    .l1.codex { color:var(--codex); }
+    .l2 { color:var(--muted); font-size:10px; padding-left:14px; }
+    .content { padding:78px 16px 16px; height:100%; }
+    .fake { background:rgba(255,255,255,.04); border-radius:16px; height:calc(100% - 10px); display:flex; align-items:center; justify-content:center; color:#48484a; font-size:13px; }
+    .lock { height:100%; background:linear-gradient(180deg,#0d1117,#010101); padding-bottom:36px; display:flex; flex-direction:column; }
+    .lock-main { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; margin-top:-20px; }
+    .big { font-size:72px; font-weight:300; letter-spacing:-2px; }
+    .date { color:var(--muted); margin-top:4px; }
+    .pill { margin-top:20px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.08); border-radius:18px; padding:10px 14px; font-family:'Roboto Mono',monospace; font-size:11px; }
+  </style>
+</head>
+<body>
+  <h1>Quota Edge</h1>
+  <p class="sub">75%/86% · 142m · 3.2d — Claude & Codex live sync</p>
+  <div class="screens">
+    <div>
+      <div class="label">홈 — 시간 아래 2줄 glance</div>
+      <div class="phone">
+        <div class="punch"></div>
+        <div class="status">
+          <div class="row">
+            <div class="left">
+              <div class="time">9:41</div>
+              <div class="glance">
+                <div class="p">
+                  <div class="l1 claude">● C 75%/86%  142m</div>
+                  <div class="l2">            3.2d</div>
+                </div>
+                <div class="p" style="margin-top:3px">
+                  <div class="l1 codex">● X 45%/62%  089m</div>
+                  <div class="l2">            2.1d</div>
+                </div>
+              </div>
+            </div>
+            <div style="font-size:12px;padding-top:2px">87%</div>
+          </div>
+        </div>
+        <div class="content"><div class="fake">Your app</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="label">잠금화면 — 동일 glance + pill</div>
+      <div class="phone">
+        <div class="punch"></div>
+        <div class="lock">
+          <div class="status">
+            <div class="row">
+              <div class="left">
+                <div class="time" style="font-size:14px">9:41</div>
+                <div class="glance">
+                  <div class="l1 claude">● C 75%/86%  142m</div>
+                  <div class="l2">            3.2d</div>
+                  <div class="l1 codex" style="margin-top:3px">● X 45%/62%  089m</div>
+                  <div class="l2">            2.1d</div>
+                </div>
+              </div>
+              <div style="font-size:12px">87%</div>
+            </div>
+          </div>
+          <div class="lock-main">
+            <div class="big">9:41</div>
+            <div class="date">금요일, 8월 28일</div>
+            <div class="pill">
+              <div class="l1 claude">● C 75%/86%  142m</div>
+              <div class="l2">            3.2d</div>
+              <div class="l1 codex" style="margin-top:4px">● X 45%/62%  089m</div>
+              <div class="l2">            2.1d</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

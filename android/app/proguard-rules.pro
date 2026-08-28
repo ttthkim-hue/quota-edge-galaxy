@@ -1,0 +1,2 @@
+-keepclassmembers class kotlinx.serialization.json.** { *; }
+-keep @kotlinx.serialization.Serializable class com.quotaedge.galaxy.** { *; }
