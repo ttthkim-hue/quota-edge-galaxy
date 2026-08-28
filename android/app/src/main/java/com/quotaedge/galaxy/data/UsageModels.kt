@@ -46,13 +46,13 @@ data class ProviderQuota(
     fun line1(): String {
         val fh = fiveHour?.usedPercent?.toString()?.padStart(2, ' ') ?: "--"
         val wk = weekly?.usedPercent?.toString()?.padStart(2, ' ') ?: "--"
-        val mins = fiveHour?.remainingMinutes()?.let { "%03dm".format(it) } ?: "---m"
-        return "${fh}%/${wk}%  $mins"
+        return "${fh}%/${wk}%"
     }
 
     fun line2(): String {
+        val mins = fiveHour?.remainingMinutes()?.let { "%03dm".format(it) } ?: "---m"
         val days = weekly?.remainingDays()?.let { "%.1fd".format(it) } ?: "-.-d"
-        return "            $days"
+        return "$mins/$days"
     }
 }
 

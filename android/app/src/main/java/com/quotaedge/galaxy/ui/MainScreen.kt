@@ -165,7 +165,7 @@ fun MainScreen() {
                     } else OverlayService.stop(context)
                 }
                 Text(
-                    "포맷: 5h%/주간% + 142m (5h 리셋) / 3.2d (주간 리셋)",
+                    "포맷: 5h%/주간% (1줄) + 142m/3.2d (리셋, 1줄)",
                     color = TextMuted,
                     fontSize = 12.sp,
                 )

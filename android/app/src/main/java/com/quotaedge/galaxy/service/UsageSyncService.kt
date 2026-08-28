@@ -55,15 +55,13 @@ class UsageSyncService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val body = buildString {
-            append("C ${snap.claude.line1()}\n")
-            append("  ${snap.claude.line2().trim()}\n")
-            append("X ${snap.codex.line1()}\n")
-            append("  ${snap.codex.line2().trim()}")
+            append("C ${snap.claude.line1()}  ${snap.claude.line2()}\n")
+            append("X ${snap.codex.line1()}  ${snap.codex.line2()}")
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_quota)
             .setContentTitle("Quota Edge")
-            .setContentText("C ${snap.claude.line1()} · X ${snap.codex.line1()}")
+            .setContentText("C ${snap.claude.line1()} ${snap.claude.line2()} · X ${snap.codex.line1()} ${snap.codex.line2()}")
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setOngoing(true)
             .setOnlyAlertOnce(true)

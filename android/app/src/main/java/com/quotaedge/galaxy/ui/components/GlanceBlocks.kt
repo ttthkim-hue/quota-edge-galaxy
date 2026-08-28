@@ -44,7 +44,7 @@ fun ProviderGlanceBlock(
             )
         }
         Text(
-            quota.line2(),
+            "  ${quota.line2()}",
             color = TextMuted,
             fontSize = (fontSize.value - 1).sp,
             fontFamily = ff,
