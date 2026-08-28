@@ -22,34 +22,25 @@ import com.quotaedge.galaxy.ui.theme.TextMuted
 
 @Composable
 fun ProviderGlanceBlock(
-    label: String,
     color: Color,
     quota: ProviderQuota,
     fontSize: TextUnit = 11.sp,
-    mono: Boolean = true,
 ) {
-    val ff = if (mono) FontFamily.Monospace else FontFamily.Default
+    val line = quota.glanceLine()
+    if (line.isBlank()) return
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("●", color = color, fontSize = fontSize, fontWeight = FontWeight.Bold)
             Spacer(Modifier.width(4.dp))
-            Text(label, color = color, fontSize = fontSize, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.width(6.dp))
             Text(
-                quota.line1().trim(),
-                color = Color.White,
+                line,
+                color = color,
                 fontSize = fontSize,
-                fontFamily = ff,
+                fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
+                maxLines = 1,
             )
         }
-        Text(
-            "  ${quota.line2()}",
-            color = TextMuted,
-            fontSize = (fontSize.value - 1).sp,
-            fontFamily = ff,
-            modifier = Modifier.width(120.dp),
-        )
         if (quota.error != null) {
             Text(quota.error.take(40), color = Color(0xFFFF453A), fontSize = 9.sp)
         }
@@ -62,9 +53,21 @@ fun DualGlancePanel(
     codex: ProviderQuota,
     fontSize: TextUnit = 11.sp,
 ) {
+    val claudeReady = claude.isGlanceReady()
+    val codexReady = codex.isGlanceReady()
     Column {
-        ProviderGlanceBlock("C", ClaudeOrange, claude, fontSize)
-        Spacer(Modifier.size(3.dp))
-        ProviderGlanceBlock("X", CodexGreen, codex, fontSize)
+        if (!claudeReady && !codexReady) {
+            Text("동기화된 항목 없음", color = TextMuted, fontSize = 12.sp)
+            return
+        }
+        if (claudeReady) {
+            ProviderGlanceBlock(ClaudeOrange, claude, fontSize)
+        }
+        if (claudeReady && codexReady) {
+            Spacer(Modifier.size(2.dp))
+        }
+        if (codexReady) {
+            ProviderGlanceBlock(CodexGreen, codex, fontSize)
+        }
     }
 }

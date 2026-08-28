@@ -2,6 +2,11 @@ node_modules/
 .DS_Store
 Thumbs.db
 *.log
+.env
+.env.*
+credentials.json
+**/auth.json
+**/.credentials.json
 
 # Android
 android/.gradle/
@@ -11,3 +16,5 @@ android/.idea/
 *.apk
 *.aab
 *.keystore
+*.jks
+*.pem

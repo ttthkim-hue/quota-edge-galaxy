@@ -1,21 +1,23 @@
-🤖 macOS 노치 옆 AI 한도 위젯 아이디어를 Galaxy로 옮겨봤습니다.
+# X launch draft (Quota Edge v1.1)
 
-Quota Edge — Edge Panel + Now Bar + Smart Handoff
-Claude / Codex / Cursor 한도를 glance → 탭 → 전환
+## Korean (primary)
 
-컨셉 초안 + 오픈 디자인 👇
-[GitHub 링크]
+Galaxy에서 Claude·Codex 남은 한도를 시계 아래에 상시로 보이게 만들었습니다.
 
-#Galaxy #OneUI #Claude #BuildInPublic
+Quota Edge — 앱 안 로그인 · 투명 HUD · Pro는 주간만 / Plus는 5h+주간
+미연동은 아예 안 띄움. 오픈소스.
 
----
+https://github.com/ttthkim-hue/quota-edge-galaxy
 
-🤖 Took the macOS side-notch AI quota idea and reimagined it for Galaxy.
+#Galaxy #OneUI #Claude #Codex #BuildInPublic #Android
 
-Quota Edge — Edge Panel + Now Bar + Smart Handoff
-Glance Claude / Codex / Cursor limits → tap → handoff before you hit the wall
+## English
 
-Concept draft + open design 👇
-[GitHub link]
+Brought the macOS side-notch AI quota idea to Galaxy.
 
-#Galaxy #OneUI #Claude #BuildInPublic
+Quota Edge — in-app Claude/Codex login · transparent HUD under the clock · Pro weekly / Plus 5h+week
+Unlinked providers stay hidden. Open source.
+
+https://github.com/ttthkim-hue/quota-edge-galaxy
+
+#Galaxy #OneUI #Claude #Codex #BuildInPublic #Android

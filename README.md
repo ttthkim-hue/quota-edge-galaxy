@@ -1,114 +1,101 @@
-# Quota Edge 🤖
+# Quota Edge
 
-**Galaxy-native Claude & Codex usage monitor** — 2-line glance (`75%/86%` + `142m/3.2d`), live API sync, overlay, lock screen widget.
+**Galaxy-native Claude & Codex usage monitor** — transparent HUD under the clock, live API sync, lock-screen notification, home widget.
 
 ![mockup](./assets/mockup-hero.png)
 
-## Features
+**Repo:** https://github.com/ttthkim-hue/quota-edge-galaxy
+
+## What it does
 
 | Feature | Description |
 |---------|-------------|
-| **Usage sync** | Claude OAuth API + Codex WHAM API (same as TokenEater / llmquota) |
-| **Glance format** | Line 1: `5h%/weekly%` · Line 2: `142m/3.2d` reset |
-| **Status overlay** | Top-left below clock (overlay permission) |
-| **Lock screen** | Persistent notification + keyguard widget |
+| **In-app login** | Claude + Codex OAuth via WebView (no token paste) |
+| **Glance HUD** | Bold text under the status-bar clock (no black plate) |
+| **Remaining %** | Matches ChatGPT / Codex UI (`100 − used`) |
+| **Pro / Plus aware** | Pro = weekly only · Plus = 5h + weekly |
+| **Unsynced = hidden** | Missing providers are omitted, not shown as `--%` |
+| **Foreground sync** | 60s refresh + restart after reboot |
 | **Home widget** | 2×2 Glance widget |
-| **Foreground sync** | 60s refresh via foreground service |
 
 ## Display format
 
 ```
-● C 75%/86%
-     142m/3.2d
-● X 45%/62%
-     089m/2.1d
+● Codex 78%  6.3d              ← ChatGPT Pro (weekly only)
+● Claude 25%/14%  142m/3.2d    ← when Claude is linked (5h + week)
 ```
 
-- `75%/86%` = 5-hour / weekly utilization
-- `142m/3.2d` = 5h reset minutes / weekly reset days
+- Percentages are **remaining** (same as ChatGPT usage UI)
+- Weekly reset days cap at **7.0d**
 - Colors: Claude `#D97757` · Codex `#10A37F`
 
 ## Quick start (Galaxy)
 
-### 1. Build & install APK (로컬)
+### 1. Build APK (local only — no GitHub Actions)
 
-GitHub Actions 없이 **Android Studio** 또는 로컬 Gradle로 빌드합니다.
+**Android Studio (recommended)**
 
-**Android Studio (권장)**
-
-1. Android Studio에서 `android/` 폴더 열기
-2. Galaxy 연결 또는 에뮬레이터 실행
-3. Run ▶ 또는 `Build → Build APK(s)`
+1. Open the `android/` folder
+2. Connect a Galaxy (or emulator)
+3. Run ▶ or `Build → Build APK(s)`
 
 **CLI**
 
 ```bash
 cd android
-# local.properties에 SDK 경로 설정 (local.properties.example 참고)
+# set SDK path in local.properties (see local.properties.example)
 ./gradlew assembleDebug   # Windows: gradlew.bat assembleDebug
 ```
 
-APK 경로: `android/app/build/outputs/apk/debug/app-debug.apk`
-
-Galaxy로 옮겨 설치 (출처 unknown 허용).
+APK: `android/app/build/outputs/apk/debug/app-debug.apk`
 
 ### 2. Connect accounts
 
-Open **Quota Edge** → paste tokens:
+Open **Quota Edge** → **Claude로 로그인** / **Codex로 로그인** → approve in WebView → **지금 동기화**.
 
-| Provider | Token source |
-|----------|--------------|
-| **Claude** | Claude Code OAuth token (Pro/Max/Team). Desktop: Keychain / `~/.claude/.credentials.json` |
-| **Codex** | `~/.codex/auth.json` → `access_token` + `account_id` |
+### 3. Enable HUD
 
-Tap **저장 & 연동** → **지금 동기화**.
+1. Allow **notifications** (lock / status)
+2. Allow **Appear on top** (다른 앱 위에 표시)
+3. Toggle **상시 표시**
+4. Optional: add the home **widget**, exclude from battery optimization
 
-### 3. Enable glance
+## Privacy
 
-1. **알림 허용** — lock screen에서 quota 표시
-2. **다른 앱 위에 표시** — status bar overlay (시간 아래)
-3. **잠금화면 glance** ON
-4. (Optional) 홈 화면에 **Quota Edge** 위젯 추가
+- Tokens stay on-device (`EncryptedSharedPreferences`)
+- Cleartext HTTP only for `localhost` OAuth loopback
+- Read-only usage endpoints — no chat content
 
-### 4. Battery
-
-Tap **배터리 최적화 제외** so 60s sync keeps running.
-
-## API endpoints (read-only)
+## API (read-only)
 
 ```
 GET https://api.anthropic.com/api/oauth/usage
-Authorization: Bearer <claude_oauth>
-anthropic-beta: oauth-2025-04-20
-
 GET https://chatgpt.com/backend-api/wham/usage
-Authorization: Bearer <codex_oauth>
-ChatGPT-Account-Id: <account_id>
 ```
 
-Tokens stored in **EncryptedSharedPreferences** on device only.
-
-## Project structure
+## Project layout
 
 ```
 quota-edge-galaxy/
-├── android/          ← Kotlin + Compose app
-├── mockups/          ← HTML concept previews
-└── assets/           ← promo images
+├── android/     Kotlin + Compose app (v1.1)
+├── mockups/     HTML concept previews
+├── assets/      promo images
+└── docs/        launch notes / X draft
 ```
 
-## Build requirements
+## Requirements
 
 - JDK 17+
 - Android SDK 35
-- Android Studio Ladybug+ (recommended)
+- Android Studio Ladybug+ recommended
+- Galaxy One UI (tested on S25)
 
 ## Roadmap
 
 - [x] Claude + Codex usage sync
-- [x] 2-line glance UI (`75%/86%` + `142m/3.2d`)
-- [x] Overlay + widget + lock screen notification
-- [ ] In-app OAuth WebView (no manual token paste)
+- [x] In-app OAuth WebView
+- [x] Transparent clock HUD + widget + notification
+- [x] Pro weekly-only / Plus 5h+week formatting
 - [ ] Samsung Edge Panel native panel
 - [ ] Play Store release
 

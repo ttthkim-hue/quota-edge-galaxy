@@ -1,11 +1,10 @@
 package com.quotaedge.galaxy.ui
 
-import android.Manifest
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import androidx.compose.foundation.background
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,8 +21,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -44,6 +42,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quotaedge.galaxy.QuotaEdgeApp
+import com.quotaedge.galaxy.auth.ClaudeOAuth
+import com.quotaedge.galaxy.auth.CodexOAuth
 import com.quotaedge.galaxy.data.UsageSnapshot
 import com.quotaedge.galaxy.service.OverlayService
 import com.quotaedge.galaxy.service.UsageSyncService
@@ -62,18 +62,33 @@ fun MainScreen() {
     val app = context.applicationContext as QuotaEdgeApp
     val scope = rememberCoroutineScope()
     val snapshot by app.snapshot.collectAsState()
-    val overlayOn by app.tokenStore.overlayEnabled.collectAsState(initial = false)
+    val overlayOn by app.tokenStore.overlayEnabled.collectAsState(initial = true)
     val lockOn by app.tokenStore.lockScreenEnabled.collectAsState(initial = true)
     val glanceOn by app.tokenStore.statusGlanceEnabled.collectAsState(initial = true)
 
-    var claudeToken by remember { mutableStateOf(app.tokenStore.getClaudeToken().orEmpty()) }
-    var codexToken by remember { mutableStateOf(app.tokenStore.getCodexToken().orEmpty()) }
-    var codexAccount by remember { mutableStateOf(app.tokenStore.getCodexAccountId().orEmpty()) }
+    var claudeLinked by remember { mutableStateOf(app.tokenStore.isClaudeLinked()) }
+    var codexLinked by remember { mutableStateOf(app.tokenStore.isCodexLinked()) }
+    var busy by remember { mutableStateOf<String?>(null) }
+    var statusMsg by remember { mutableStateOf<String?>(null) }
+
+    fun toast(msg: String) {
+        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+        statusMsg = msg
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Quota Edge", fontWeight = FontWeight.Bold) },
+                title = {
+                    Column {
+                        Text("Quota Edge", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Claude · Codex 남은 한도 · v1.1",
+                            color = TextMuted,
+                            fontSize = 12.sp,
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = BgDark, titleContentColor = Color.White),
             )
         },
@@ -88,68 +103,152 @@ fun MainScreen() {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             PreviewCard(snapshot)
+            val debugStatus = remember(snapshot.updatedAtEpochMs) {
+                context.getSharedPreferences("quota_debug", android.content.Context.MODE_PRIVATE)
+                    .getString("last_status", null)
+            }
+            if (debugStatus != null) {
+                Text(debugStatus, color = TextMuted, fontSize = 12.sp)
+            }
+            if (statusMsg != null) {
+                Text(statusMsg!!, color = TextMuted, fontSize = 12.sp)
+            }
+            snapshot.claude.error?.let {
+                Text("Claude 오류: $it", color = Color(0xFFFF453A), fontSize = 12.sp)
+            }
+            snapshot.codex.error?.let {
+                Text("Codex 오류: $it", color = Color(0xFFFF453A), fontSize = 12.sp)
+            }
+
             Button(
                 onClick = {
                     UsageSyncService.start(context)
                     scope.launch {
-                        app.updateSnapshot(app.usageRepository.refresh())
+                        busy = "sync"
+                        runCatching { app.updateSnapshot(app.usageRepository.refresh()) }
+                            .onSuccess {
+                                val st = context.getSharedPreferences("quota_debug", android.content.Context.MODE_PRIVATE)
+                                    .getString("last_status", "동기화 완료")
+                                toast(st ?: "동기화 완료")
+                                claudeLinked = app.tokenStore.isClaudeLinked()
+                                codexLinked = app.tokenStore.isCodexLinked()
+                            }
+                            .onFailure { toast(it.message ?: "동기화 실패") }
+                        busy = null
                     }
                 },
+                enabled = busy == null,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = CodexGreen),
-            ) { Text("지금 동기화") }
+            ) { Text(if (busy == "sync") "동기화 중…" else "지금 동기화") }
 
             SettingsCard("연동 — Claude") {
-                OutlinedTextField(
-                    value = claudeToken,
-                    onValueChange = { claudeToken = it },
-                    label = { Text("OAuth Bearer Token") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                Text(
+                    if (claudeLinked) "상태: 연동됨" else "상태: 미연동",
+                    color = if (claudeLinked) ClaudeOrange else TextMuted,
+                    fontSize = 13.sp,
                 )
-                Button(onClick = {
-                    app.tokenStore.saveClaudeToken(claudeToken)
-                    UsageSyncService.start(context)
-                }, colors = ButtonDefaults.buttonColors(containerColor = ClaudeOrange)) {
-                    Text("Claude 저장 & 연동")
+                Text(
+                    "버튼을 누르면 앱 안에서 Claude 로그인 화면이 열립니다. 승인 후 자동 연결됩니다.",
+                    color = TextMuted,
+                    fontSize = 12.sp,
+                )
+                Button(
+                    onClick = {
+                        scope.launch {
+                            busy = "claude"
+                            runCatching { ClaudeOAuth.login(context, app.tokenStore) }
+                                .onSuccess {
+                                    claudeLinked = true
+                                    toast("Claude 연동 완료")
+                                    UsageSyncService.start(context)
+                                    app.updateSnapshot(app.usageRepository.refresh())
+                                }
+                                .onFailure { toast("Claude 로그인 실패: ${it.message}") }
+                            busy = null
+                        }
+                    },
+                    enabled = busy == null,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = ClaudeOrange),
+                ) {
+                    Text(
+                        when {
+                            busy == "claude" -> "로그인 대기 중…"
+                            claudeLinked -> "Claude 다시 로그인"
+                            else -> "Claude로 로그인"
+                        },
+                    )
+                }
+                if (claudeLinked) {
+                    OutlinedButton(
+                        onClick = {
+                            app.tokenStore.clearClaude()
+                            claudeLinked = false
+                            toast("Claude 연동 해제")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Claude 연동 해제") }
                 }
             }
 
             SettingsCard("연동 — Codex") {
-                OutlinedTextField(
-                    value = codexToken,
-                    onValueChange = { codexToken = it },
-                    label = { Text("OAuth Access Token") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                Text(
+                    if (codexLinked) "상태: 연동됨" else "상태: 미연동",
+                    color = if (codexLinked) CodexGreen else TextMuted,
+                    fontSize = 13.sp,
                 )
-                OutlinedTextField(
-                    value = codexAccount,
-                    onValueChange = { codexAccount = it },
-                    label = { Text("ChatGPT-Account-Id") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                Text(
+                    "버튼을 누르면 앱 안에서 ChatGPT 로그인 화면이 열립니다. 승인 후 자동 연결됩니다.",
+                    color = TextMuted,
+                    fontSize = 12.sp,
                 )
-                Button(onClick = {
-                    app.tokenStore.saveCodexToken(codexToken)
-                    app.tokenStore.saveCodexAccountId(codexAccount)
-                    UsageSyncService.start(context)
-                }, colors = ButtonDefaults.buttonColors(containerColor = CodexGreen)) {
-                    Text("Codex 저장 & 연동")
+                Button(
+                    onClick = {
+                        scope.launch {
+                            busy = "codex"
+                            runCatching { CodexOAuth.login(context, app.tokenStore) }
+                                .onSuccess {
+                                    codexLinked = true
+                                    toast("Codex 연동 완료")
+                                    UsageSyncService.start(context)
+                                    app.updateSnapshot(app.usageRepository.refresh())
+                                }
+                                .onFailure { toast("Codex 로그인 실패: ${it.message}") }
+                            busy = null
+                        }
+                    },
+                    enabled = busy == null,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = CodexGreen),
+                ) {
+                    Text(
+                        when {
+                            busy == "codex" -> "로그인 대기 중…"
+                            codexLinked -> "Codex 다시 로그인"
+                            else -> "Codex로 로그인"
+                        },
+                    )
+                }
+                if (codexLinked) {
+                    OutlinedButton(
+                        onClick = {
+                            app.tokenStore.clearCodex()
+                            codexLinked = false
+                            toast("Codex 연동 해제")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Codex 연동 해제") }
                 }
             }
 
             SettingsCard("표시") {
-                ToggleRow("상태바 glance (시간 아래)", glanceOn) {
-                    scope.launch { app.tokenStore.setStatusGlanceEnabled(it) }
-                    if (it) OverlayService.start(context) else OverlayService.stop(context)
-                }
-                ToggleRow("잠금화면 glance", lockOn) {
-                    scope.launch { app.tokenStore.setLockScreenEnabled(it) }
-                }
-                ToggleRow("오버레이 서비스", overlayOn) {
-                    scope.launch { app.tokenStore.setOverlayEnabled(it) }
-                    if (it) {
+                ToggleRow("상시 표시 (다른 앱 위에)", overlayOn || glanceOn) { on ->
+                    scope.launch {
+                        app.tokenStore.setOverlayEnabled(on)
+                        app.tokenStore.setStatusGlanceEnabled(on)
+                    }
+                    if (on) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
                             !Settings.canDrawOverlays(context)
                         ) {
@@ -164,15 +263,26 @@ fun MainScreen() {
                         }
                     } else OverlayService.stop(context)
                 }
+                ToggleRow("잠금화면에도 표시", lockOn) {
+                    scope.launch {
+                        app.tokenStore.setLockScreenEnabled(it)
+                        if (overlayOn || glanceOn) OverlayService.start(context)
+                    }
+                }
                 Text(
-                    "포맷: 5h%/주간% (1줄) + 142m/3.2d (리셋, 1줄)",
+                    "시계 아래에 글자만 표시됩니다. ‘다른 앱 위에 표시’를 허용하세요. One UI는 잠금화면에서 오버레이를 숨길 수 있습니다.",
                     color = TextMuted,
                     fontSize = 12.sp,
                 )
             }
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                Button(
+            SettingsCard("안정성") {
+                Text(
+                    "재부팅 후에도 동기화가 다시 시작됩니다. 배터리 최적화를 끄면 백그라운드 갱신이 더 안정적입니다.",
+                    color = TextMuted,
+                    fontSize = 12.sp,
+                )
+                OutlinedButton(
                     onClick = {
                         context.startActivity(
                             Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
@@ -181,7 +291,7 @@ fun MainScreen() {
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("배터리 최적화 제외 (백그라운드 갱신)") }
+                ) { Text("배터리 최적화 제외") }
             }
         }
     }
@@ -194,10 +304,23 @@ private fun PreviewCard(snapshot: UsageSnapshot) {
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(16.dp)) {
-            Text("Live glance", color = TextMuted, fontSize = 12.sp)
-            Spacer(Modifier.height(8.dp))
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("미리보기 (남은% · 미연동은 미표기)", color = TextMuted, fontSize = 12.sp)
             DualGlancePanel(snapshot.claude, snapshot.codex, fontSize = 13.sp)
+            if (snapshot.claude.isGlanceReady() || snapshot.codex.isGlanceReady()) {
+                Text("상세", color = TextMuted, fontSize = 12.sp)
+                if (snapshot.claude.connected) {
+                    Text("Claude\n${snapshot.claude.detailSummary()}", color = ClaudeOrange, fontSize = 12.sp)
+                }
+                if (snapshot.codex.connected) {
+                    Text("Codex\n${snapshot.codex.detailSummary()}", color = CodexGreen, fontSize = 12.sp)
+                }
+            }
+            Text(
+                "Plus: 5h%/주간% · 리셋 m/d  ·  Pro: 주간만 (최대 7.0d)",
+                color = TextMuted,
+                fontSize = 11.sp,
+            )
         }
     }
 }
