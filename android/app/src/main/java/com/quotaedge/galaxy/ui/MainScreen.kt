@@ -8,10 +8,8 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,13 +42,15 @@ import androidx.compose.ui.unit.sp
 import com.quotaedge.galaxy.QuotaEdgeApp
 import com.quotaedge.galaxy.auth.ClaudeOAuth
 import com.quotaedge.galaxy.auth.CodexOAuth
+import com.quotaedge.galaxy.auth.GrokOAuth
 import com.quotaedge.galaxy.data.UsageSnapshot
 import com.quotaedge.galaxy.service.OverlayService
 import com.quotaedge.galaxy.service.UsageSyncService
-import com.quotaedge.galaxy.ui.components.DualGlancePanel
+import com.quotaedge.galaxy.ui.components.SnapshotGlancePanel
 import com.quotaedge.galaxy.ui.theme.BgDark
 import com.quotaedge.galaxy.ui.theme.ClaudeOrange
 import com.quotaedge.galaxy.ui.theme.CodexGreen
+import com.quotaedge.galaxy.ui.theme.GrokGray
 import com.quotaedge.galaxy.ui.theme.SurfaceDark
 import com.quotaedge.galaxy.ui.theme.TextMuted
 import kotlinx.coroutines.launch
@@ -68,6 +68,7 @@ fun MainScreen() {
 
     var claudeLinked by remember { mutableStateOf(app.tokenStore.isClaudeLinked()) }
     var codexLinked by remember { mutableStateOf(app.tokenStore.isCodexLinked()) }
+    var grokLinked by remember { mutableStateOf(app.tokenStore.isGrokLinked()) }
     var busy by remember { mutableStateOf<String?>(null) }
     var statusMsg by remember { mutableStateOf<String?>(null) }
 
@@ -83,7 +84,7 @@ fun MainScreen() {
                     Column {
                         Text("Quota Edge", fontWeight = FontWeight.Bold)
                         Text(
-                            "Claude · Codex 남은 한도 · v1.1",
+                            "Claude · Codex · Grok 남은 한도 · v1.2",
                             color = TextMuted,
                             fontSize = 12.sp,
                         )
@@ -113,12 +114,9 @@ fun MainScreen() {
             if (statusMsg != null) {
                 Text(statusMsg!!, color = TextMuted, fontSize = 12.sp)
             }
-            snapshot.claude.error?.let {
-                Text("Claude 오류: $it", color = Color(0xFFFF453A), fontSize = 12.sp)
-            }
-            snapshot.codex.error?.let {
-                Text("Codex 오류: $it", color = Color(0xFFFF453A), fontSize = 12.sp)
-            }
+            snapshot.claude.error?.let { Text("Claude 오류: $it", color = Color(0xFFFF453A), fontSize = 12.sp) }
+            snapshot.codex.error?.let { Text("Codex 오류: $it", color = Color(0xFFFF453A), fontSize = 12.sp) }
+            snapshot.grok.error?.let { Text("Grok 오류: $it", color = Color(0xFFFF453A), fontSize = 12.sp) }
 
             Button(
                 onClick = {
@@ -132,6 +130,7 @@ fun MainScreen() {
                                 toast(st ?: "동기화 완료")
                                 claudeLinked = app.tokenStore.isClaudeLinked()
                                 codexLinked = app.tokenStore.isCodexLinked()
+                                grokLinked = app.tokenStore.isGrokLinked()
                             }
                             .onFailure { toast(it.message ?: "동기화 실패") }
                         busy = null
@@ -142,105 +141,89 @@ fun MainScreen() {
                 colors = ButtonDefaults.buttonColors(containerColor = CodexGreen),
             ) { Text(if (busy == "sync") "동기화 중…" else "지금 동기화") }
 
-            SettingsCard("연동 — Claude") {
-                Text(
-                    if (claudeLinked) "상태: 연동됨" else "상태: 미연동",
-                    color = if (claudeLinked) ClaudeOrange else TextMuted,
-                    fontSize = 13.sp,
-                )
-                Text(
-                    "버튼을 누르면 앱 안에서 Claude 로그인 화면이 열립니다. 승인 후 자동 연결됩니다.",
-                    color = TextMuted,
-                    fontSize = 12.sp,
-                )
-                Button(
-                    onClick = {
-                        scope.launch {
-                            busy = "claude"
-                            runCatching { ClaudeOAuth.login(context, app.tokenStore) }
-                                .onSuccess {
-                                    claudeLinked = true
-                                    toast("Claude 연동 완료")
-                                    UsageSyncService.start(context)
-                                    app.updateSnapshot(app.usageRepository.refresh())
-                                }
-                                .onFailure { toast("Claude 로그인 실패: ${it.message}") }
-                            busy = null
-                        }
-                    },
-                    enabled = busy == null,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = ClaudeOrange),
-                ) {
-                    Text(
-                        when {
-                            busy == "claude" -> "로그인 대기 중…"
-                            claudeLinked -> "Claude 다시 로그인"
-                            else -> "Claude로 로그인"
-                        },
-                    )
-                }
-                if (claudeLinked) {
-                    OutlinedButton(
-                        onClick = {
-                            app.tokenStore.clearClaude()
-                            claudeLinked = false
-                            toast("Claude 연동 해제")
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Claude 연동 해제") }
-                }
-            }
+            ProviderLoginCard(
+                title = "연동 — Claude",
+                linked = claudeLinked,
+                accent = ClaudeOrange,
+                help = "버튼을 누르면 앱 안에서 Claude 로그인 화면이 열립니다.",
+                busy = busy == "claude",
+                enabled = busy == null,
+                onLogin = {
+                    scope.launch {
+                        busy = "claude"
+                        runCatching { ClaudeOAuth.login(context, app.tokenStore) }
+                            .onSuccess {
+                                claudeLinked = true
+                                toast("Claude 연동 완료")
+                                UsageSyncService.start(context)
+                                app.updateSnapshot(app.usageRepository.refresh())
+                            }
+                            .onFailure { toast("Claude 로그인 실패: ${it.message}") }
+                        busy = null
+                    }
+                },
+                onClear = {
+                    app.tokenStore.clearClaude()
+                    claudeLinked = false
+                    toast("Claude 연동 해제")
+                },
+            )
 
-            SettingsCard("연동 — Codex") {
-                Text(
-                    if (codexLinked) "상태: 연동됨" else "상태: 미연동",
-                    color = if (codexLinked) CodexGreen else TextMuted,
-                    fontSize = 13.sp,
-                )
-                Text(
-                    "버튼을 누르면 앱 안에서 ChatGPT 로그인 화면이 열립니다. 승인 후 자동 연결됩니다.",
-                    color = TextMuted,
-                    fontSize = 12.sp,
-                )
-                Button(
-                    onClick = {
-                        scope.launch {
-                            busy = "codex"
-                            runCatching { CodexOAuth.login(context, app.tokenStore) }
-                                .onSuccess {
-                                    codexLinked = true
-                                    toast("Codex 연동 완료")
-                                    UsageSyncService.start(context)
-                                    app.updateSnapshot(app.usageRepository.refresh())
-                                }
-                                .onFailure { toast("Codex 로그인 실패: ${it.message}") }
-                            busy = null
-                        }
-                    },
-                    enabled = busy == null,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = CodexGreen),
-                ) {
-                    Text(
-                        when {
-                            busy == "codex" -> "로그인 대기 중…"
-                            codexLinked -> "Codex 다시 로그인"
-                            else -> "Codex로 로그인"
-                        },
-                    )
-                }
-                if (codexLinked) {
-                    OutlinedButton(
-                        onClick = {
-                            app.tokenStore.clearCodex()
-                            codexLinked = false
-                            toast("Codex 연동 해제")
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Codex 연동 해제") }
-                }
-            }
+            ProviderLoginCard(
+                title = "연동 — Codex",
+                linked = codexLinked,
+                accent = CodexGreen,
+                help = "버튼을 누르면 앱 안에서 ChatGPT 로그인 화면이 열립니다.",
+                busy = busy == "codex",
+                enabled = busy == null,
+                onLogin = {
+                    scope.launch {
+                        busy = "codex"
+                        runCatching { CodexOAuth.login(context, app.tokenStore) }
+                            .onSuccess {
+                                codexLinked = true
+                                toast("Codex 연동 완료")
+                                UsageSyncService.start(context)
+                                app.updateSnapshot(app.usageRepository.refresh())
+                            }
+                            .onFailure { toast("Codex 로그인 실패: ${it.message}") }
+                        busy = null
+                    }
+                },
+                onClear = {
+                    app.tokenStore.clearCodex()
+                    codexLinked = false
+                    toast("Codex 연동 해제")
+                },
+            )
+
+            ProviderLoginCard(
+                title = "연동 — Grok",
+                linked = grokLinked,
+                accent = GrokGray,
+                help = "SuperGrok / xAI 계정으로 로그인합니다. 주간 공유 한도를 읽습니다. API 키는 쓰지 않습니다.",
+                busy = busy == "grok",
+                enabled = busy == null,
+                onLogin = {
+                    scope.launch {
+                        busy = "grok"
+                        runCatching { GrokOAuth.login(context, app.tokenStore) }
+                            .onSuccess {
+                                grokLinked = true
+                                toast("Grok 연동 완료")
+                                UsageSyncService.start(context)
+                                app.updateSnapshot(app.usageRepository.refresh())
+                            }
+                            .onFailure { toast("Grok 로그인 실패: ${it.message}") }
+                        busy = null
+                    }
+                },
+                onClear = {
+                    app.tokenStore.clearGrok()
+                    grokLinked = false
+                    toast("Grok 연동 해제")
+                },
+            )
 
             SettingsCard("표시") {
                 ToggleRow("상시 표시 (다른 앱 위에)", overlayOn || glanceOn) { on ->
@@ -270,7 +253,7 @@ fun MainScreen() {
                     }
                 }
                 Text(
-                    "시계 아래에 글자만 표시됩니다. ‘다른 앱 위에 표시’를 허용하세요. One UI는 잠금화면에서 오버레이를 숨길 수 있습니다.",
+                    "시계 아래에 글자만 표시됩니다. ‘다른 앱 위에 표시’를 허용하세요.",
                     color = TextMuted,
                     fontSize = 12.sp,
                 )
@@ -278,7 +261,7 @@ fun MainScreen() {
 
             SettingsCard("안정성") {
                 Text(
-                    "재부팅 후에도 동기화가 다시 시작됩니다. 배터리 최적화를 끄면 백그라운드 갱신이 더 안정적입니다.",
+                    "재부팅 후에도 동기화가 다시 시작됩니다.",
                     color = TextMuted,
                     fontSize = 12.sp,
                 )
@@ -306,21 +289,56 @@ private fun PreviewCard(snapshot: UsageSnapshot) {
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("미리보기 (남은% · 미연동은 미표기)", color = TextMuted, fontSize = 12.sp)
-            DualGlancePanel(snapshot.claude, snapshot.codex, fontSize = 13.sp)
-            if (snapshot.claude.isGlanceReady() || snapshot.codex.isGlanceReady()) {
-                Text("상세", color = TextMuted, fontSize = 12.sp)
-                if (snapshot.claude.connected) {
-                    Text("Claude\n${snapshot.claude.detailSummary()}", color = ClaudeOrange, fontSize = 12.sp)
-                }
-                if (snapshot.codex.connected) {
-                    Text("Codex\n${snapshot.codex.detailSummary()}", color = CodexGreen, fontSize = 12.sp)
-                }
+            SnapshotGlancePanel(snapshot, fontSize = 13.sp)
+            if (snapshot.claude.connected) {
+                Text("Claude\n${snapshot.claude.detailSummary()}", color = ClaudeOrange, fontSize = 12.sp)
             }
+            if (snapshot.codex.connected) {
+                Text("Codex\n${snapshot.codex.detailSummary()}", color = CodexGreen, fontSize = 12.sp)
+            }
+            if (snapshot.grok.connected) {
+                Text("Grok\n${snapshot.grok.detailSummary()}", color = GrokGray, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProviderLoginCard(
+    title: String,
+    linked: Boolean,
+    accent: Color,
+    help: String,
+    busy: Boolean,
+    enabled: Boolean,
+    onLogin: () -> Unit,
+    onClear: () -> Unit,
+) {
+    SettingsCard(title) {
+        Text(
+            if (linked) "상태: 연동됨" else "상태: 미연동",
+            color = if (linked) accent else TextMuted,
+            fontSize = 13.sp,
+        )
+        Text(help, color = TextMuted, fontSize = 12.sp)
+        Button(
+            onClick = onLogin,
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = accent),
+        ) {
             Text(
-                "Plus: 5h%/주간% · 리셋 m/d  ·  Pro: 주간만 (최대 7.0d)",
-                color = TextMuted,
-                fontSize = 11.sp,
+                when {
+                    busy -> "로그인 대기 중…"
+                    linked -> title.substringAfter("— ").trim() + " 다시 로그인"
+                    else -> title.substringAfter("— ").trim() + "로 로그인"
+                },
             )
+        }
+        if (linked) {
+            OutlinedButton(onClick = onClear, modifier = Modifier.fillMaxWidth()) {
+                Text(title.substringAfter("— ").trim() + " 연동 해제")
+            }
         }
     }
 }
