@@ -65,8 +65,21 @@ class TokenStore(private val context: Context) {
         prefs().getLong(KEY_CODEX_EXPIRES, 0L).takeIf { it > 0 }
             ?: plain.getLong(KEY_CODEX_EXPIRES, 0L)
 
+    fun getGrokToken(): String? =
+        prefs().getString(KEY_GROK, null)?.takeIf { it.isNotBlank() }
+            ?: plain.getString(KEY_GROK, null)?.takeIf { it.isNotBlank() }
+
+    fun getGrokRefresh(): String? =
+        prefs().getString(KEY_GROK_REFRESH, null)?.takeIf { it.isNotBlank() }
+            ?: plain.getString(KEY_GROK_REFRESH, null)?.takeIf { it.isNotBlank() }
+
+    fun getGrokExpiresAt(): Long =
+        prefs().getLong(KEY_GROK_EXPIRES, 0L).takeIf { it > 0 }
+            ?: plain.getLong(KEY_GROK_EXPIRES, 0L)
+
     fun isClaudeLinked(): Boolean = !getClaudeToken().isNullOrBlank()
     fun isCodexLinked(): Boolean = !getCodexToken().isNullOrBlank()
+    fun isGrokLinked(): Boolean = !getGrokToken().isNullOrBlank()
 
     fun saveClaudeSession(accessToken: String, refreshToken: String?, expiresAtMs: Long) {
         writeAll { ed ->
@@ -94,6 +107,16 @@ class TokenStore(private val context: Context) {
         Log.i("QuotaEdge", "Codex session saved tokenLen=${accessToken.length} account=${accountId != null}")
     }
 
+    fun saveGrokSession(accessToken: String, refreshToken: String?, expiresAtMs: Long) {
+        writeAll { ed ->
+            ed.putString(KEY_GROK, accessToken.trim())
+            ed.putString(KEY_GROK_REFRESH, refreshToken?.trim().orEmpty())
+            ed.putLong(KEY_GROK_EXPIRES, expiresAtMs)
+            ed.putBoolean(KEY_GROK_LINKED, true)
+        }
+        Log.i("QuotaEdge", "Grok session saved tokenLen=${accessToken.length}")
+    }
+
     fun clearClaude() = writeAll { ed ->
         ed.remove(KEY_CLAUDE).remove(KEY_CLAUDE_REFRESH).remove(KEY_CLAUDE_EXPIRES)
             .putBoolean(KEY_CLAUDE_LINKED, false)
@@ -102,6 +125,11 @@ class TokenStore(private val context: Context) {
     fun clearCodex() = writeAll { ed ->
         ed.remove(KEY_CODEX).remove(KEY_CODEX_REFRESH).remove(KEY_CODEX_ACCOUNT).remove(KEY_CODEX_EXPIRES)
             .putBoolean(KEY_CODEX_LINKED, false)
+    }
+
+    fun clearGrok() = writeAll { ed ->
+        ed.remove(KEY_GROK).remove(KEY_GROK_REFRESH).remove(KEY_GROK_EXPIRES)
+            .putBoolean(KEY_GROK_LINKED, false)
     }
 
     private fun writeAll(block: (SharedPreferences.Editor) -> Unit) {
@@ -154,6 +182,10 @@ class TokenStore(private val context: Context) {
         private const val KEY_CODEX_ACCOUNT = "codex_account_id"
         private const val KEY_CODEX_EXPIRES = "codex_expires_at"
         private const val KEY_CODEX_LINKED = "codex_linked"
+        private const val KEY_GROK = "grok_oauth_token"
+        private const val KEY_GROK_REFRESH = "grok_refresh_token"
+        private const val KEY_GROK_EXPIRES = "grok_expires_at"
+        private const val KEY_GROK_LINKED = "grok_linked"
         private const val PREF_OVERLAY = "overlay_enabled"
         private const val PREF_LOCK = "lock_screen_enabled"
         private const val PREF_GLANCE = "status_glance_enabled"
