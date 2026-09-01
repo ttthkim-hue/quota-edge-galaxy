@@ -5,7 +5,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-/** Persist last successful glance so HUD survives screen-off / process restart. */
 object SnapshotCache {
     private const val PREFS = "quota_snapshot"
     private const val KEY = "json"
@@ -31,6 +30,7 @@ object SnapshotCache {
     private data class Snap(
         val claude: Prov = Prov(),
         val codex: Prov = Prov(),
+        val grok: Prov = Prov(),
         val updatedAtEpochMs: Long = 0L,
     )
 
@@ -39,6 +39,7 @@ object SnapshotCache {
             Snap(
                 claude = snapshot.claude.toProv(),
                 codex = snapshot.codex.toProv(),
+                grok = snapshot.grok.toProv(),
                 updatedAtEpochMs = snapshot.updatedAtEpochMs,
             ),
         )
@@ -56,6 +57,7 @@ object SnapshotCache {
             UsageSnapshot(
                 claude = s.claude.toQuota(Provider.CLAUDE),
                 codex = s.codex.toQuota(Provider.CODEX),
+                grok = s.grok.toQuota(Provider.GROK),
                 updatedAtEpochMs = s.updatedAtEpochMs,
             )
         }.getOrNull()
