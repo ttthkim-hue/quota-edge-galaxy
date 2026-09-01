@@ -32,6 +32,7 @@ class QuotaWidget : GlanceAppWidget() {
             val prefs = context.getSharedPreferences("quota_cache", Context.MODE_PRIVATE)
             val claude = prefs.getString("claude_line", "")!!.trim()
             val codex = prefs.getString("codex_line", "")!!.trim()
+            val grok = prefs.getString("grok_line", "")!!.trim()
             val open = Intent(context, MainActivity::class.java)
             GlanceTheme {
                 Column(
@@ -48,32 +49,22 @@ class QuotaWidget : GlanceAppWidget() {
                         ),
                     )
                     Spacer(GlanceModifier.height(6.dp))
+                    var shown = false
                     if (claude.isNotEmpty()) {
-                        Text(
-                            "● $claude",
-                            style = TextStyle(
-                                color = ColorProvider(Color.parseColor("#D97757")),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                            ),
-                            maxLines = 1,
-                        )
-                    }
-                    if (claude.isNotEmpty() && codex.isNotEmpty()) {
-                        Spacer(GlanceModifier.height(2.dp))
+                        Text("● $claude", style = lineStyle("#D97757"), maxLines = 1)
+                        shown = true
                     }
                     if (codex.isNotEmpty()) {
-                        Text(
-                            "● $codex",
-                            style = TextStyle(
-                                color = ColorProvider(Color.parseColor("#10A37F")),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                            ),
-                            maxLines = 1,
-                        )
+                        if (shown) Spacer(GlanceModifier.height(2.dp))
+                        Text("● $codex", style = lineStyle("#10A37F"), maxLines = 1)
+                        shown = true
                     }
-                    if (claude.isEmpty() && codex.isEmpty()) {
+                    if (grok.isNotEmpty()) {
+                        if (shown) Spacer(GlanceModifier.height(2.dp))
+                        Text("● $grok", style = lineStyle("#E8E8EA"), maxLines = 1)
+                        shown = true
+                    }
+                    if (!shown) {
                         Text(
                             "동기화된 항목 없음",
                             style = TextStyle(
@@ -88,6 +79,12 @@ class QuotaWidget : GlanceAppWidget() {
     }
 
     companion object {
+        private fun lineStyle(hex: String) = TextStyle(
+            color = ColorProvider(Color.parseColor(hex)),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+        )
+
         fun updateAll(context: Context) {
             runBlocking {
                 val manager = GlanceAppWidgetManager(context)
