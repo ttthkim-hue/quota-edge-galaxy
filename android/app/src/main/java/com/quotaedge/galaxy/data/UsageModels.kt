@@ -10,7 +10,7 @@ import java.time.Instant
 import java.time.OffsetDateTime
 import kotlin.math.roundToInt
 
-enum class Provider { CLAUDE, CODEX }
+enum class Provider { CLAUDE, CODEX, GROK }
 
 data class QuotaWindow(
     val usedPercent: Int,
@@ -58,20 +58,19 @@ data class ProviderQuota(
     fun displayName(): String = when (provider) {
         Provider.CLAUDE -> "Claude"
         Provider.CODEX -> "Codex"
+        Provider.GROK -> "Grok"
     }
 
-    /** ChatGPT Pro has no 5h window; Plus and below do. */
     fun shownFiveHour(): QuotaWindow? =
         if (provider == Provider.CODEX && planType.equals("pro", ignoreCase = true)) null
+        else if (provider == Provider.GROK) null
         else fiveHour
 
     private fun weeklyDayCap(): Double = 7.0
 
-    /** Synced with at least one window — unsynced providers are omitted (미표기). */
     fun isGlanceReady(): Boolean =
         connected && error == null && (shownFiveHour() != null || weekly != null)
 
-    /** Glance % is remaining (100 − used), matching ChatGPT / Codex UI. */
     fun line1(): String {
         val fh = shownFiveHour()?.remainingPercent()?.toString()?.plus("%")
         val wk = weekly?.remainingPercent()?.toString()?.plus("%")
@@ -94,7 +93,6 @@ data class ProviderQuota(
         }
     }
 
-    /** Plus: Codex 55%/38%  142m/2.1d · Pro: Codex 79%  6.3d — empty when unsynced. */
     fun glanceLine(): String {
         if (!isGlanceReady()) return ""
         val a = line1()
@@ -114,6 +112,7 @@ data class ProviderQuota(
         parts += windowDetail("5h", shownFiveHour(), missing = when {
             provider == Provider.CODEX && planType.equals("pro", ignoreCase = true) ->
                 "5h 없음 (Pro는 주간만)"
+            provider == Provider.GROK -> "5h 없음 (SuperGrok 주간 풀)"
             else -> "5h 없음"
         })
         parts += windowDetail("주간", weekly)
@@ -145,12 +144,14 @@ data class ProviderQuota(
 data class UsageSnapshot(
     val claude: ProviderQuota,
     val codex: ProviderQuota,
+    val grok: ProviderQuota = ProviderQuota(Provider.GROK, null, null, connected = false),
     val updatedAtEpochMs: Long = System.currentTimeMillis(),
 ) {
     companion object {
         fun empty() = UsageSnapshot(
             claude = ProviderQuota(Provider.CLAUDE, null, null, connected = false),
             codex = ProviderQuota(Provider.CODEX, null, null, connected = false),
+            grok = ProviderQuota(Provider.GROK, null, null, connected = false),
         )
     }
 }
