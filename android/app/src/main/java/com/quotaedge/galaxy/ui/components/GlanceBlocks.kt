@@ -16,8 +16,10 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quotaedge.galaxy.data.ProviderQuota
+import com.quotaedge.galaxy.data.UsageSnapshot
 import com.quotaedge.galaxy.ui.theme.ClaudeOrange
 import com.quotaedge.galaxy.ui.theme.CodexGreen
+import com.quotaedge.galaxy.ui.theme.GrokGray
 import com.quotaedge.galaxy.ui.theme.TextMuted
 
 @Composable
@@ -53,21 +55,34 @@ fun DualGlancePanel(
     codex: ProviderQuota,
     fontSize: TextUnit = 11.sp,
 ) {
-    val claudeReady = claude.isGlanceReady()
-    val codexReady = codex.isGlanceReady()
+    TripleGlancePanel(claude, codex, null, fontSize)
+}
+
+@Composable
+fun TripleGlancePanel(
+    claude: ProviderQuota,
+    codex: ProviderQuota,
+    grok: ProviderQuota?,
+    fontSize: TextUnit = 11.sp,
+) {
+    val items = listOfNotNull(
+        claude.takeIf { it.isGlanceReady() }?.let { ClaudeOrange to it },
+        codex.takeIf { it.isGlanceReady() }?.let { CodexGreen to it },
+        grok?.takeIf { it.isGlanceReady() }?.let { GrokGray to it },
+    )
     Column {
-        if (!claudeReady && !codexReady) {
+        if (items.isEmpty()) {
             Text("동기화된 항목 없음", color = TextMuted, fontSize = 12.sp)
             return
         }
-        if (claudeReady) {
-            ProviderGlanceBlock(ClaudeOrange, claude, fontSize)
-        }
-        if (claudeReady && codexReady) {
-            Spacer(Modifier.size(2.dp))
-        }
-        if (codexReady) {
-            ProviderGlanceBlock(CodexGreen, codex, fontSize)
+        items.forEachIndexed { index, (color, quota) ->
+            if (index > 0) Spacer(Modifier.size(2.dp))
+            ProviderGlanceBlock(color, quota, fontSize)
         }
     }
+}
+
+@Composable
+fun SnapshotGlancePanel(snapshot: UsageSnapshot, fontSize: TextUnit = 11.sp) {
+    TripleGlancePanel(snapshot.claude, snapshot.codex, snapshot.grok, fontSize)
 }
