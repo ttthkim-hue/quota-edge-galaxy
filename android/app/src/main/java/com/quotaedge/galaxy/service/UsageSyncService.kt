@@ -84,7 +84,7 @@ class UsageSyncService : Service() {
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val lines = listOf(snap.claude.glanceLine(), snap.codex.glanceLine())
+        val lines = listOf(snap.claude.glanceLine(), snap.codex.glanceLine(), snap.grok.glanceLine())
             .filter { it.isNotBlank() }
             .map { "● $it" }
         val body = lines.joinToString("\n").ifBlank { "동기화된 항목 없음 — 앱에서 로그인" }
@@ -106,7 +106,7 @@ class UsageSyncService : Service() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL_ID, "Quota sync", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Claude & Codex usage refresh"
+                description = "Claude, Codex, Grok usage refresh"
                 setShowBadge(false)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             },
@@ -116,7 +116,6 @@ class UsageSyncService : Service() {
     override fun onDestroy() {
         loopJob?.cancel()
         overlayJob?.cancel()
-        // Keep HUD attached across brief service restarts; wake/user-present will remount if needed.
         super.onDestroy()
     }
 
