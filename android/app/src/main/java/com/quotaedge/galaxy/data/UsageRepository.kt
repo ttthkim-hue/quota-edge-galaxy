@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.quotaedge.galaxy.auth.ClaudeOAuth
 import com.quotaedge.galaxy.auth.CodexOAuth
+import com.quotaedge.galaxy.auth.GrokOAuth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -61,6 +62,41 @@ class UsageApiClient {
             }
         }
 
+    suspend fun fetchGrok(token: String): Result<GrokParseResult> = withContext(Dispatchers.IO) {
+        runCatching {
+            val billingReq = Request.Builder()
+                .url("https://cli-chat-proxy.grok.com/v1/billing?format=credits")
+                .header("Authorization", "Bearer $token")
+                .header("x-xai-token-auth", "xai-grok-cli")
+                .header("Accept", "application/json")
+                .header("User-Agent", "QuotaEdge/1.2")
+                .get()
+                .build()
+            val billingBody = http.newCall(billingReq).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                Log.i(TAG, "Grok billing HTTP ${resp.code} len=${body.length} head=${body.take(180)}")
+                if (!resp.isSuccessful) error("Grok billing HTTP ${resp.code}: ${body.take(160)}")
+                body
+            }
+            val plan = runCatching {
+                val settingsReq = Request.Builder()
+                    .url("https://cli-chat-proxy.grok.com/v1/settings")
+                    .header("Authorization", "Bearer $token")
+                    .header("x-xai-token-auth", "xai-grok-cli")
+                    .header("Accept", "application/json")
+                    .get()
+                    .build()
+                http.newCall(settingsReq).execute().use { resp ->
+                    val body = resp.body?.string().orEmpty()
+                    if (!resp.isSuccessful) null else GrokUsageParser.parsePlan(body)
+                }
+            }.getOrNull()
+            val parsed = GrokUsageParser.parseBilling(billingBody, plan)
+            if (parsed.weekly == null) error("Grok parse empty: ${billingBody.take(160)}")
+            parsed.copy(redactedRaw = UsageJsonRedactor.redact(billingBody))
+        }
+    }
+
     companion object {
         private const val TAG = "QuotaEdge"
     }
@@ -74,10 +110,10 @@ class UsageRepository(
     suspend fun refresh(): UsageSnapshot {
         var claude = ProviderQuota(Provider.CLAUDE, null, null, connected = false)
         var codex = ProviderQuota(Provider.CODEX, null, null, connected = false)
+        var grok = ProviderQuota(Provider.GROK, null, null, connected = false)
         val notes = mutableListOf<String>()
 
         val claudeTok = ClaudeOAuth.refreshIfNeeded(tokenStore)
-        Log.i("QuotaEdge", "Claude token present=${claudeTok != null} len=${claudeTok?.length ?: 0}")
         if (claudeTok == null) {
             notes += "Claude: 미연동"
         } else {
@@ -96,7 +132,6 @@ class UsageRepository(
 
         val codexTok = CodexOAuth.refreshIfNeeded(tokenStore)
         val accountId = tokenStore.getCodexAccountId()
-        Log.i("QuotaEdge", "Codex token present=${codexTok != null} account=${accountId != null}")
         if (codexTok == null) {
             notes += "Codex: 미연동"
         } else {
@@ -111,18 +146,36 @@ class UsageRepository(
                         extraLimits = parsed.extraLimits,
                     )
                     notes += "Codex: ${quota.glanceLine()} (plan=${parsed.planType ?: "?"})"
-                    if (parsed.redactedRaw.isNotBlank()) {
-                        context.getSharedPreferences("quota_debug", Context.MODE_PRIVATE)
-                            .edit()
-                            .putString("last_codex_raw", parsed.redactedRaw)
-                            .apply()
-                    }
                     quota
                 },
                 onFailure = { e ->
                     notes += "Codex: ${e.message}"
                     Log.e("QuotaEdge", "Codex fetch failed", e)
                     ProviderQuota(Provider.CODEX, null, null, connected = true, error = e.message)
+                },
+            )
+        }
+
+        val grokTok = GrokOAuth.refreshIfNeeded(tokenStore)
+        if (grokTok == null) {
+            notes += "Grok: 미연동"
+        } else {
+            grok = api.fetchGrok(grokTok).fold(
+                onSuccess = { parsed ->
+                    val quota = ProviderQuota(
+                        Provider.GROK,
+                        fiveHour = null,
+                        weekly = parsed.weekly,
+                        connected = true,
+                        planType = parsed.planType ?: "SuperGrok",
+                    )
+                    notes += "Grok: ${quota.glanceLine()} (plan=${quota.planType})"
+                    quota
+                },
+                onFailure = { e ->
+                    notes += "Grok: ${e.message}"
+                    Log.e("QuotaEdge", "Grok fetch failed", e)
+                    ProviderQuota(Provider.GROK, null, null, connected = true, error = e.message)
                 },
             )
         }
@@ -134,6 +187,6 @@ class UsageRepository(
             .putLong("last_sync", System.currentTimeMillis())
             .commit()
 
-        return UsageSnapshot(claude, codex)
+        return UsageSnapshot(claude, codex, grok)
     }
 }
