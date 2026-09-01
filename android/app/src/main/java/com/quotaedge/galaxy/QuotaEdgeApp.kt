@@ -23,6 +23,7 @@ class QuotaEdgeApp : Application() {
         getSharedPreferences("quota_cache", MODE_PRIVATE).edit()
             .putString("claude_line", s.claude.glanceLine())
             .putString("codex_line", s.codex.glanceLine())
+            .putString("grok_line", s.grok.glanceLine())
             .putLong("updated", s.updatedAtEpochMs)
             .apply()
         SnapshotCache.save(this, s)
@@ -38,6 +39,7 @@ class QuotaEdgeApp : Application() {
             getSharedPreferences("quota_cache", MODE_PRIVATE).edit()
                 .putString("claude_line", cached.claude.glanceLine())
                 .putString("codex_line", cached.codex.glanceLine())
+                .putString("grok_line", cached.grok.glanceLine())
                 .putLong("updated", cached.updatedAtEpochMs)
                 .apply()
         }
